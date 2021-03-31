@@ -351,8 +351,25 @@ var MyAgent = {
       matrix.push(tmp);
     }
 
-    return matrix;
+    // Ajuste de la matriz
+    const pos = [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1]]
 
+    var aMatrix = new Array(matrix.length);
+    for(var i = 0; i < matrix.length; i++) aMatrix[i] = [...matrix[i]]
+
+    for(var i = 0; i < matrix.length; i++) {
+      for(var j = 0; j < matrix[i].length; j++){
+        if(matrix[i][j] == TYPES.CAR || matrix[i][j] == TYPES.HOUSE) {
+          for(var c of pos) {
+            if(c[0] + i < 0 || c[0] + i >= matrix.length || c[1] + j < 0 || c[1] + j >= matrix[i].length)
+              continue;
+            aMatrix[c[0] + i][c[1] + j] = matrix[i][j]
+          }
+        }
+      }
+    }
+
+    return aMatrix;
   },
 
   canvasController: CanvasController,
@@ -362,6 +379,8 @@ var MyAgent = {
 
   gameState: 'Begin',
   
+  graph: {},
+
   iniciar: async () => {
     await MyAgent.canvasController.click(playVector);
     gameState = 'Level 1';
@@ -380,7 +399,8 @@ var MyAgent = {
   },
 
   pensar: async()=>{
-    
+    // Build Graph
+
   },
 
   actuar: async()=>{
