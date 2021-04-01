@@ -4,7 +4,12 @@ var up = { x: 93, y: 244}
 var rigth = { x: 163, y: 311}
 var left = { x: 28, y: 311}
 
+var CROSS_POS = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+var BORDER_POS = [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1]]
+    
+
 var cellSize = 5;
+var pathSize = 2;
 
 // 220 ms equivale al movimiento de 25 px
 var defaultTimeout = 220;
@@ -15,6 +20,7 @@ var TYPES = {
   OWL: 'OWL',
   HOUSE: 'HOUSE',
   OTHER: 'OTHER',
+  PATH: 'PATH'
 }
 
 // Objeto con todo lo relacionado al canvas. Repreenta los metodos de entrada y salida del programa
@@ -110,11 +116,11 @@ var CanvasController = {
   var img = CanvasController.getImage();
 
   for(var i = 0; cellSize * i < img.length; i++) {
-    for(var j = 0; j < img[cellSize * i].length; j++) img[cellSize * i][j] = lineColor;
+    for(var j = 0; j < img[cellSize * i].length; j++) img[cellSize * i][j] = CanvasController.lineColor;
   }
 
   for(var i = 0; i < img.length; i++) {
-    for(var j = 0; cellSize * j < img[i].length; j++) img[i][cellSize * j] = lineColor;
+    for(var j = 0; cellSize * j < img[i].length; j++) img[i][cellSize * j] = CanvasController.lineColor;
   }
 
   CanvasController.drawImg(img);
@@ -174,7 +180,7 @@ var CanvasController = {
       Math.abs(p1.t - p2.t) <= delta;
   },
 
-  DrawMatrix: (matrix) => {
+  DrawMatrix: (matrix, drawPaths) => {
 
 
     var imgMatrix = [];
@@ -193,6 +199,7 @@ var CanvasController = {
           case TYPES.HOUSE: toPush = {r: 255, g: 255, b: 0, t: 255}; break;
           case TYPES.OWL: toPush = {r: 0, g: 255, b: 255, t: 255}; break;
           case TYPES.STREET: toPush = {r: 255, g: 0, b: 255, t: 255}; break;
+          case TYPES.PATH: toPush = {r: 253, g: 159, b: 39, t: 255}; break;
           default: toPush = {r: 0, g: 0, b: 0, t: 255};
         }
   
@@ -201,8 +208,9 @@ var CanvasController = {
         }
       }
     }
-    
+
     CanvasController.drawImg(imgMatrix);
+
   }
 
 }
@@ -352,7 +360,6 @@ var MyAgent = {
     }
 
     // Ajuste de la matriz
-    const pos = [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1]]
 
     var aMatrix = new Array(matrix.length);
     for(var i = 0; i < matrix.length; i++) aMatrix[i] = [...matrix[i]]
@@ -360,7 +367,7 @@ var MyAgent = {
     for(var i = 0; i < matrix.length; i++) {
       for(var j = 0; j < matrix[i].length; j++){
         if(matrix[i][j] == TYPES.CAR || matrix[i][j] == TYPES.HOUSE) {
-          for(var c of pos) {
+          for(var c of BORDER_POS) {
             if(c[0] + i < 0 || c[0] + i >= matrix.length || c[1] + j < 0 || c[1] + j >= matrix[i].length)
               continue;
             aMatrix[c[0] + i][c[1] + j] = matrix[i][j]
@@ -379,7 +386,49 @@ var MyAgent = {
 
   gameState: 'Begin',
   
-  graph: {},
+  carCenter: {x: -1, y: -1},
+
+  findZone: (x, y)=>{
+    var used = [{ x, y }]
+    var current = [{ x, y }]
+    while(current.length != 0){
+      var el = current.shift();
+      for(var dir of CROSS_POS){
+        var xp = el.x + dir[1], yp = el.y + dir[0];
+        if(yp < 0 || yp >= MyAgent.matrix.length || xp < 0 || xp >  MyAgent.matrix[yp].length) continue;
+        if(MyAgent.matrix[yp][xp] == MyAgent.matrix[y][x] && !used.find((finded)=> yp === finded.y && xp === finded.x)) {
+          used.push({x: xp, y: yp})
+          current.push({x: xp, y: yp})
+        }
+      }
+    }
+
+    return used;
+  },
+
+  isPath: (x, y) => {
+
+    const PATH_TYPES = [TYPES.CAR, TYPES.HOUSE, TYPES.STREET, TYPES.PATH];
+    // La celda actual es un posible camino?
+
+    for (let i = -pathSize; i <= pathSize; i++) for (let j = -pathSize; j <= pathSize; j++) {
+      var xp = x + j, yp = y + i;
+      if(yp < 0 || yp >= MyAgent.matrix.length || xp < 0 || xp >= MyAgent.matrix[yp].length) return false;
+      if(!PATH_TYPES.find(el => MyAgent.matrix[yp][xp] == el)) return false;
+    }
+
+    return true;
+  },
+
+  connectedByPath: (x, y) =>{
+    const exit = [];
+
+    for(var dir of CROSS_POS){
+      if(MyAgent.isPath(x + dir[0], y + dir[1])) exit.push({x: x + dir[0], y: y + dir[1]})
+    }
+
+     return exit;
+  },
 
   iniciar: async () => {
     await MyAgent.canvasController.click(playVector);
@@ -399,7 +448,50 @@ var MyAgent = {
   },
 
   pensar: async()=>{
-    // Build Graph
+    //--------Build Graph-----------
+
+    // Find car
+    var carZone = [];
+    var usedZones = [];
+    
+    for (let i = 0; i < MyAgent.matrix.length; i++) for (let j = 0; j < MyAgent.matrix[i].length; j++) {
+      if(usedZones.find(el => el.x == j && el.y == i)) continue;
+      if(MyAgent.matrix[i][j] == TYPES.CAR) {
+        var tmpZone = MyAgent.findZone(j, i);
+        usedZones = usedZones.concat(tmpZone);
+        if(carZone.length == 0 || carZone.length < tmpZone.length) carZone = tmpZone;
+      }
+    }
+    
+    var carCenter = carZone.reduce((el, current) => ({x: current.x + el.x, y: current.y + el.y}), {x: 0, y: 0})
+    carCenter = {
+      x: Math.floor(carCenter.x / carZone.length),
+      y: Math.floor(carCenter.y / carZone.length),
+    }
+
+    MyAgent.carCenter = carCenter;
+
+    // Add path to matrix to draw posibilities
+
+    MyAgent.matrix[carCenter.y][carCenter.x] = TYPES.PATH;
+    var used = [carCenter];
+    var current = [carCenter]
+
+    while(current.length != 0){
+      var el = current.shift();
+      for (const near of MyAgent.connectedByPath(el.x, el.y)) {
+        if(!used.find(finded => finded.x == near.x && finded.y == near.y)){
+          MyAgent.matrix[near.y][near.x] = TYPES.PATH;
+          used.push(near);
+          current.push(near);
+        }
+      }
+    }
+
+    // Searching path
+
+    
+
 
   },
 
@@ -408,13 +500,15 @@ var MyAgent = {
   },
 
   main: async ()=>{
-
-    await MyAgent.iniciar();
-
+    console.log("Sensando");
     await MyAgent.sensar();
+    console.log("Pensando");
     await MyAgent.pensar();
+    console.log("Actuando");
     await MyAgent.actuar();
+    console.log("Terminando");
   },
 }
 
+MyAgent.iniciar();
 MyAgent.main();
