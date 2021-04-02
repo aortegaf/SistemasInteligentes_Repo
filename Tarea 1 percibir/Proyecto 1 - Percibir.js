@@ -6,7 +6,6 @@ var left = { x: 28, y: 311}
 
 var CROSS_POS = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 var BORDER_POS = [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1]]
-    
 
 var cellSize = 5;
 var pathSize = 2;
@@ -180,7 +179,7 @@ var CanvasController = {
       Math.abs(p1.t - p2.t) <= delta;
   },
 
-  DrawMatrix: (matrix, drawPaths) => {
+  DrawMatrix: (matrix) => {
 
 
     var imgMatrix = [];
@@ -414,7 +413,7 @@ var MyAgent = {
     for (let i = -pathSize; i <= pathSize; i++) for (let j = -pathSize; j <= pathSize; j++) {
       var xp = x + j, yp = y + i;
       if(yp < 0 || yp >= MyAgent.matrix.length || xp < 0 || xp >= MyAgent.matrix[yp].length) return false;
-      if(!PATH_TYPES.find(el => MyAgent.matrix[yp][xp] == el)) return false;
+      if(!PATH_TYPES.find((el) => MyAgent.matrix[yp][xp] == el)) return false;
     }
 
     return true;
@@ -430,15 +429,16 @@ var MyAgent = {
      return exit;
   },
 
-  iniciar: async () => {
+  iniciar: async () => {MyAgent.matrix
     await MyAgent.canvasController.click(playVector);
-    gameState = 'Level 1';
+    MyAgent.gameState = 'Level 1';
     // Wait 200 ms
     await new Promise((resolve) => setTimeout(() => resolve(), 200)).then();
   },
 
   sensar: async ()=>{
-    switch(gameState){
+    console.log(MyAgent.gameState);
+    switch(MyAgent.gameState){
       case 'Begin': return;
       case 'Level 1': 
         MyAgent.pixelMatrix = MyAgent.canvasController.getImage();
@@ -459,7 +459,7 @@ var MyAgent = {
       if(MyAgent.matrix[i][j] == TYPES.CAR) {
         var tmpZone = MyAgent.findZone(j, i);
         usedZones = usedZones.concat(tmpZone);
-        if(carZone.length == 0 || carZone.length < tmpZone.length) carZone = tmpZone;
+        if(carZone.length < tmpZone.length) carZone = tmpZone;
       }
     }
     
@@ -471,11 +471,16 @@ var MyAgent = {
 
     MyAgent.carCenter = carCenter;
 
+
+    // Searching path
+
+
+    
     // Add path to matrix to draw posibilities
 
     MyAgent.matrix[carCenter.y][carCenter.x] = TYPES.PATH;
     var used = [carCenter];
-    var current = [carCenter]
+    var current = [carCenter];
 
     while(current.length != 0){
       var el = current.shift();
@@ -485,13 +490,9 @@ var MyAgent = {
           used.push(near);
           current.push(near);
         }
+
       }
     }
-
-    // Searching path
-
-    
-
 
   },
 
@@ -510,5 +511,6 @@ var MyAgent = {
   },
 }
 
-MyAgent.iniciar();
-MyAgent.main();
+MyAgent.iniciar().then(()=>{
+  MyAgent.main();
+});
