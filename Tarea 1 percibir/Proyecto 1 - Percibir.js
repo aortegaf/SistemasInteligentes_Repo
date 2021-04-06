@@ -4,6 +4,40 @@ var up = { x: 93, y: 244}
 var rigth = { x: 163, y: 311}
 var left = { x: 28, y: 311}
 
+
+/**
+
+#############################################
+#  C1111111111111111111111111111111111111   #
+#                                       1   #
+#                                       1   #
+#                                       1   #
+#                                       1   #
+#                                       1   #
+#                                       1   #
+#                                       1   #
+#                                #      1   #
+#                                #      1   #
+#                                #      1   #
+#                                #      1   #
+#                                #      1   #
+#                                #      1K  #
+#############################################
+
+###############
+#             #
+#             #
+#             #
+#             #
+#             #
+#             #
+###############
+
+
+
+*/
+
+
 var CROSS_POS = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 var BORDER_POS = [[-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1]]
 
@@ -19,7 +53,8 @@ var TYPES = {
   OWL: 'OWL',
   HOUSE: 'HOUSE',
   OTHER: 'OTHER',
-  PATH: 'PATH'
+  PATH: 'PATH',
+  SELECTED_PATH: 'SELECTED_PATH'
 }
 
 // Objeto con todo lo relacionado al canvas. Repreenta los metodos de entrada y salida del programa
@@ -199,6 +234,7 @@ var CanvasController = {
           case TYPES.OWL: toPush = {r: 0, g: 255, b: 255, t: 255}; break;
           case TYPES.STREET: toPush = {r: 255, g: 0, b: 255, t: 255}; break;
           case TYPES.PATH: toPush = {r: 253, g: 159, b: 39, t: 255}; break;
+          case TYPES.SELECTED_PATH: toPush = {r: 165, g: 161, b: 220, t: 255}; break;
           default: toPush = {r: 0, g: 0, b: 0, t: 255};
         }
   
@@ -386,6 +422,7 @@ var MyAgent = {
   gameState: 'Begin',
   
   carCenter: {x: -1, y: -1},
+  houseCenter: {x: -1, y: -1},
 
   findZone: (x, y)=>{
     var used = [{ x, y }]
@@ -471,10 +508,28 @@ var MyAgent = {
 
     MyAgent.carCenter = carCenter;
 
+    var houseZone = [];
+
+    for (let i = 0; i < MyAgent.matrix.length; i++) for (let j = 0; j < MyAgent.matrix[i].length; j++) {
+      if(usedZones.find(el => el.x == j && el.y == i)) continue;
+      if(MyAgent.matrix[i][j] == TYPES.HOUSE) {
+        var tmpZone = MyAgent.findZone(j, i);
+        usedZones = usedZones.concat(tmpZone);
+        if(houseZone.length < tmpZone.length) houseZone = tmpZone;
+      }
+    }
+
+    
+    var houseCenter = houseZone.reduce((el, current) => ({x: current.x + el.x, y: current.y + el.y}), {x: 0, y: 0})
+    houseCenter = {
+      x: Math.floor(houseCenter.x / houseZone.length),
+      y: Math.floor(houseCenter.y / houseZone.length),
+    }
+
+    
+    MyAgent.houseCenter = houseCenter;
 
     // Searching path
-
-
     
     // Add path to matrix to draw posibilities
 
@@ -493,6 +548,7 @@ var MyAgent = {
 
       }
     }
+
 
   },
 
