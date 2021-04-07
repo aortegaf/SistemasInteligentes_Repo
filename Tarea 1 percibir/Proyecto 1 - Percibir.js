@@ -45,7 +45,8 @@ var cellSize = 5;
 var pathSize = 2;
 
 // 220 ms equivale al movimiento de 25 px
-var defaultTimeout = 220;
+var relation = 200;
+var defaultTimeout = relation * cellSize / 25;
 
 var TYPES = {
   CAR: 'CAR',
@@ -54,7 +55,8 @@ var TYPES = {
   HOUSE: 'HOUSE',
   OTHER: 'OTHER',
   PATH: 'PATH',
-  SELECTED_PATH: 'SELECTED_PATH'
+  SELECTED_PATH: 'SELECTED_PATH',
+  SPECIAL: 'SPECIAL',
 }
 
 // Objeto con todo lo relacionado al canvas. Repreenta los metodos de entrada y salida del programa
@@ -235,6 +237,7 @@ var CanvasController = {
           case TYPES.STREET: toPush = {r: 255, g: 0, b: 255, t: 255}; break;
           case TYPES.PATH: toPush = {r: 253, g: 159, b: 39, t: 255}; break;
           case TYPES.SELECTED_PATH: toPush = {r: 165, g: 161, b: 220, t: 255}; break;
+          case TYPES.SPECIAL: toPush = {r: 182, g: 151, b: 33, t: 255}; break;
           default: toPush = {r: 0, g: 0, b: 0, t: 255};
         }
   
@@ -419,8 +422,6 @@ var MyAgent = {
   matrix: null,
   debug: false,
 
-  gameState: 'Begin',
-  
   carCenter: {x: -1, y: -1},
   houseCenter: {x: -1, y: -1},
 
@@ -442,9 +443,32 @@ var MyAgent = {
     return used;
   },
 
+  findZoneOfType: (type) => {
+    var zone = [];
+    var usedZones = [];
+    
+    for (let i = 0; i < MyAgent.matrix.length; i++) for (let j = 0; j < MyAgent.matrix[i].length; j++) {
+      if(usedZones.find(el => el.x == j && el.y == i)) continue;
+      if(MyAgent.matrix[i][j] == type) {
+        var tmpZone = MyAgent.findZone(j, i);
+        usedZones = usedZones.concat(tmpZone);
+        if(zone.length < tmpZone.length) zone = tmpZone;
+      }
+    }
+    
+    var center = zone.reduce((el, current) => ({x: current.x + el.x, y: current.y + el.y}), {x: 0, y: 0})
+    center = {
+      x: Math.floor(center.x / zone.length),
+      y: Math.floor(center.y / zone.length),
+    }
+
+    return center;
+
+  },
+
   isPath: (x, y) => {
 
-    const PATH_TYPES = [TYPES.CAR, TYPES.HOUSE, TYPES.STREET, TYPES.PATH, TYPES.SELECTED_PATH];
+    const PATH_TYPES = [TYPES.CAR, TYPES.HOUSE, TYPES.STREET, TYPES.PATH, TYPES.SELECTED_PATH, TYPES.SPECIAL];
     // La celda actual es un posible camino?
 
     for (let i = -pathSize; i <= pathSize; i++) for (let j = -pathSize; j <= pathSize; j++) {
@@ -499,67 +523,26 @@ var MyAgent = {
 
   iniciar: async () => {MyAgent.matrix
     await MyAgent.canvasController.click(playVector);
-    MyAgent.gameState = 'Level 1';
-    // Wait 200 ms
     await new Promise((resolve) => setTimeout(() => resolve(), 200)).then();
   },
 
   sensar: async ()=>{
-    console.log(MyAgent.gameState);
-    switch(MyAgent.gameState){
-      case 'Begin': return;
-      case 'Level 1': 
-        MyAgent.pixelMatrix = MyAgent.canvasController.getImage();
-        MyAgent.matrix = MyAgent.getMatrix();
-        break;
-    }
+    MyAgent.pixelMatrix = MyAgent.canvasController.getImage();
+    MyAgent.matrix= MyAgent.getMatrix();
   },
 
   pensar: async()=>{
     //--------Build Graph-----------
 
     // Find car
-    var carZone = [];
-    var usedZones = [];
-    
-    for (let i = 0; i < MyAgent.matrix.length; i++) for (let j = 0; j < MyAgent.matrix[i].length; j++) {
-      if(usedZones.find(el => el.x == j && el.y == i)) continue;
-      if(MyAgent.matrix[i][j] == TYPES.CAR) {
-        var tmpZone = MyAgent.findZone(j, i);
-        usedZones = usedZones.concat(tmpZone);
-        if(carZone.length < tmpZone.length) carZone = tmpZone;
-      }
-    }
-    
-    var carCenter = carZone.reduce((el, current) => ({x: current.x + el.x, y: current.y + el.y}), {x: 0, y: 0})
-    carCenter = {
-      x: Math.floor(carCenter.x / carZone.length),
-      y: Math.floor(carCenter.y / carZone.length),
-    }
+    var carCenter = MyAgent.findZoneOfType(TYPES.CAR);
 
     MyAgent.carCenter = carCenter;
 
     // Find House
 
-    var houseZone = [];
+    var houseCenter = MyAgent.findZoneOfType(TYPES.CAR);
 
-    for (let i = 0; i < MyAgent.matrix.length; i++) for (let j = 0; j < MyAgent.matrix[i].length; j++) {
-      if(usedZones.find(el => el.x == j && el.y == i)) continue;
-      if(MyAgent.matrix[i][j] == TYPES.HOUSE) {
-        var tmpZone = MyAgent.findZone(j, i);
-        usedZones = usedZones.concat(tmpZone);
-        if(houseZone.length < tmpZone.length) houseZone = tmpZone;
-      }
-    }
-
-    
-    var houseCenter = houseZone.reduce((el, current) => ({x: current.x + el.x, y: current.y + el.y}), {x: 0, y: 0})
-    houseCenter = {
-      x: Math.floor(houseCenter.x / houseZone.length),
-      y: Math.floor(houseCenter.y / houseZone.length),
-    }
-
-    
     MyAgent.houseCenter = houseCenter;
 
     // Searching path
@@ -580,6 +563,7 @@ var MyAgent = {
       next = prioQueue;
       prioQueue = prioQueue.next;
 
+      //if(next.data.y == houseCenter.y && next.data.x == houseCenter.x) break;
       if(MyAgent.matrix[next.data.y][next.data.x] == TYPES.HOUSE) break;
 
       var possibles = MyAgent.connectedByPath(next.data.x, next.data.y);
@@ -621,21 +605,57 @@ var MyAgent = {
       cLoc = cLoc.father
     }
 
-
+    MyAgent.matrix[carCenter.y][carCenter.x] = TYPES.SPECIAL
+    MyAgent.matrix[houseCenter.y][houseCenter.x] = TYPES.SPECIAL
   },
 
   actuar: async()=>{
     MyAgent.canvasController.DrawMatrix(MyAgent.matrix);
+    var currentLevel = exportRoot.currentFrame;
+
+    while(exportRoot.currentFrame == currentLevel){
+
+      // Encontrar la direccion
+
+      var nx, ny;
+      var dir;
+      for (const crossDir of CROSS_POS) {
+        nx = MyAgent.carCenter.x + crossDir[0], ny = MyAgent.carCenter.y + crossDir[1]
+        if(ny < 0 || ny > MyAgent.matrix.length || nx < 0 || nx >= MyAgent.matrix[ny].length) continue;
+        if(MyAgent.matrix[ny][nx] == TYPES.SELECTED_PATH){
+          dir = crossDir;
+          break;
+        }
+      }
+
+      // Mover
+      if(dir[1] == -1) await CanvasController.click(up, 1);
+      else if(dir[1] == 1) await CanvasController.click(down, 1);
+      else if(dir[0] == 1) await CanvasController.click(rigth, 1);
+      else await CanvasController.click(left, 1);
+
+      MyAgent.matrix[ny][nx] = TYPES.PATH;
+
+      MyAgent.carCenter.x = nx;
+      MyAgent.carCenter.y = ny;
+    }
+
   },
 
   main: async ()=>{
-    console.log("Sensando");
-    await MyAgent.sensar();
-    console.log("Pensando");
-    await MyAgent.pensar();
-    console.log("Actuando");
-    await MyAgent.actuar();
-    console.log("Terminando");
+
+    while(exportRoot.currentFrame != 4){
+      console.log("Sensando");
+      await MyAgent.sensar();
+      console.log("Pensando");
+      await MyAgent.pensar();
+      console.log("Actuando");
+      await MyAgent.actuar();
+      console.log("Terminando");
+    }
+      
+
+    
   },
 }
 
