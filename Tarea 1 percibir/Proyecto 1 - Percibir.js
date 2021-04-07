@@ -444,7 +444,7 @@ var MyAgent = {
 
   isPath: (x, y) => {
 
-    const PATH_TYPES = [TYPES.CAR, TYPES.HOUSE, TYPES.STREET, TYPES.PATH];
+    const PATH_TYPES = [TYPES.CAR, TYPES.HOUSE, TYPES.STREET, TYPES.PATH, TYPES.SELECTED_PATH];
     // La celda actual es un posible camino?
 
     for (let i = -pathSize; i <= pathSize; i++) for (let j = -pathSize; j <= pathSize; j++) {
@@ -465,6 +465,37 @@ var MyAgent = {
 
      return exit;
   },
+
+  distance: (p1, p2)=>{
+    return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y)
+  },
+
+  // Añade un elemento a la lista de prioridad list.
+  addPriority: (list, prio, data, father, dist)=>{
+  
+    if(list == null || prio <= list.prio) return {
+      prio: prio, 
+      data: data,
+      next: list,
+      father: father,
+      dist: dist,
+    }
+  
+    var current = list;
+    while(current.next && current.next.prio < prio) current = current.next;
+    var tmp = current.next;
+    current.next = {
+      prio: prio, 
+      data: data,
+      next: tmp,
+      father: father,
+      dist: dist,
+    }
+  
+    return list;
+  },
+
+
 
   iniciar: async () => {MyAgent.matrix
     await MyAgent.canvasController.click(playVector);
@@ -508,6 +539,8 @@ var MyAgent = {
 
     MyAgent.carCenter = carCenter;
 
+    // Find House
+
     var houseZone = [];
 
     for (let i = 0; i < MyAgent.matrix.length; i++) for (let j = 0; j < MyAgent.matrix[i].length; j++) {
@@ -531,6 +564,39 @@ var MyAgent = {
 
     // Searching path
     
+    var prioQueue = {
+      prio: MyAgent.distance(carCenter, houseCenter),
+      data: carCenter,
+      next: null,
+      father: null,
+      dist: 0,
+    }
+
+    var next = prioQueue;
+
+    var used = [carCenter];
+
+    while(prioQueue){
+      next = prioQueue;
+      prioQueue = prioQueue.next;
+
+      if(MyAgent.matrix[next.data.y][next.data.x] == TYPES.HOUSE) break;
+
+      var possibles = MyAgent.connectedByPath(next.data.x, next.data.y);
+      
+      for (const pos of possibles) {
+        if(!used.find((el) => el.x == pos.x && el.y == pos.y)){
+          prioQueue = MyAgent.addPriority(prioQueue, next.dist + 1 + MyAgent.distance(pos, houseCenter), pos, next, next.dist + 1);
+          used.push(pos)
+        }
+      }
+    }
+
+    if(!next){
+      console.log("No hay caminos!!!");
+      return;
+    }
+
     // Add path to matrix to draw posibilities
 
     MyAgent.matrix[carCenter.y][carCenter.x] = TYPES.PATH;
@@ -547,6 +613,12 @@ var MyAgent = {
         }
 
       }
+    }
+
+    var cLoc = next;
+    while(cLoc){
+      MyAgent.matrix[cLoc.data.y][cLoc.data.x] = TYPES.SELECTED_PATH
+      cLoc = cLoc.father
     }
 
 
