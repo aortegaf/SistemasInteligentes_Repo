@@ -45,7 +45,7 @@ var cellSize = 5;
 var pathSize = 2;
 
 // 220 ms equivale al movimiento de 25 px
-var relation = 200;
+var relation = 215;
 var defaultTimeout = relation * cellSize / 25;
 
 var TYPES = {
@@ -541,7 +541,7 @@ var MyAgent = {
 
     // Find House
 
-    var houseCenter = MyAgent.findZoneOfType(TYPES.CAR);
+    var houseCenter = MyAgent.findZoneOfType(TYPES.HOUSE);
 
     MyAgent.houseCenter = houseCenter;
 
@@ -563,8 +563,7 @@ var MyAgent = {
       next = prioQueue;
       prioQueue = prioQueue.next;
 
-      //if(next.data.y == houseCenter.y && next.data.x == houseCenter.x) break;
-      if(MyAgent.matrix[next.data.y][next.data.x] == TYPES.HOUSE) break;
+      if(next.data.y == houseCenter.y && next.data.x == houseCenter.x) break;
 
       var possibles = MyAgent.connectedByPath(next.data.x, next.data.y);
       
