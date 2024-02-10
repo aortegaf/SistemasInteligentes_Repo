@@ -4,4 +4,4 @@ MyAgent analizes the elements contained in a maze from an online kids game, crea
 
 To run go to: https://www.juegosinfantilespum.com/laberintos-online/12-auto-buhos.php and paste the code contained in MyAgent.js into the browsers console, the result will look like this after completing the three mazes in the game:
 
-![alt text](image-1.png)
+![image.png](image.png)
