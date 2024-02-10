@@ -1,4 +1,4 @@
-# Maze Analysis - Machine Learning
+# Maze Analysis
 
 MyAgent analizes the elements contained in a maze from an online kids game and creates a visual in different colors to understand how MyAgent "sees" the maze.
 
